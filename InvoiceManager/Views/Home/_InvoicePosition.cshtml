@@ -1,0 +1,99 @@
+﻿@model IEnumerable<InvoiceManager.Models.Domains.InvoicePosition>
+
+<div class="row">
+    <h2>Pozycje faktury</h2>
+    <table class="table table-hover table-striped mt-3 mb-5">
+        <thead>
+            <tr>
+                <th scope="col">Lp</th>
+                <th scope="col">Produkt</th>
+                <th scope="col">Ilosc</th>
+                <th scope="col">Wartosc</th>
+                <th scope="col"></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var position in Model)
+            {
+                <tr>
+                    <td>
+                        <a class="font-weight-bold"
+                           href="@Url.Action("InvoicePosition","Home", new { invoiceId = position.InvoiceId,
+                             invoicePositionId = position.Id})">@position.Lp</a>
+                        </td>
+                        <td>@position.Product.Name</td>
+                        <td>@position.Quantity</td>
+                        <td>@position.Value zl</td>
+                        <td>
+                            <button class="btn btn-danger tn-sm"
+                                    onclick="deleteInvoicePosition('@position.Id', '@position.InvoiceId',this)">
+                                Usun
+                            </button>
+                        </td>
+                    </tr>
+                }
+        </tbody>
+    </table>
+
+</div>
+
+
+@section Scripts
+    {
+    <script type="text/javascript">
+        function generatePdf() {
+
+        }
+
+        function deleteInvoicePosition(id, invoiceId, btn) {
+            if (!confirm("Czy na pewno chcesz usunac pozycje? Jestem w _InvoicePositionCsHtml")) {
+                return;  //Jesli "Nie" to wychodzimy z tej funkcji
+            }
+
+             $.ajax({
+                    type: 'POST',
+                    url: "@Url.Action("DeletePosition", "Home")",
+                    data: {
+                        id: id,
+                        invoiceId: invoiceId
+
+                    },
+                    success: function (data) {
+                        if (data.Success) {
+                            //Usuwanie
+                            var row = btn.parentNode.parentNode;  //pobieramy caly wiersz
+                            row.parentNode.removeChild(row); //usuwamy caly wiersz
+
+                            /* tez OK
+                            var invoiceVal = data.InvoiceValue;
+                            $('#Invoice_Value').val(invoiceVal.toFixed(2).replace(".", ",")) //jQuery
+                            */
+                            $('#Invoice_Value').val(data.invoiceVal.toFixed(2).replace(".", ",")) //jQuery
+
+                        } else {
+                            alert(data.Message);
+                        }
+
+                    },
+                    error: function (data) {
+                        alert(data.Message);
+                    },
+                    dataType: 'json'
+             });
+
+        }
+
+        $(document).ready(function () {
+            $('#PaymentDate').datepicker({
+                format: "dd-mm-yyyy",
+                language: "pl",
+                multidate: false,
+                autoclose: true,
+                todayHighlight: true,
+                forceParse: false
+            })
+        });
+
+    </script>
+
+}

@@ -1,0 +1,186 @@
+﻿@model InvoiceManager.Models.ViewModels.EditInvoiceViewModel
+@{
+    ViewBag.Title = Model.Heading;
+}
+
+<h1 class="mb-3">@Model.Heading</h1>
+
+@if (Model.Invoice.Id != 0)
+{
+    <button class="btn btn-primary mb-3"
+            onclick='window.location.href="@Url.Action("InvoicePosition","Home", new { invoiceId = Model.Invoice.Id})"'>
+        Dodac pozycje
+    </button>
+
+    <button class="btn btn-secondary mb-3" onclick="generatePdf()">
+        Generuj PDF
+    </button>
+}
+
+
+<div class="row">
+    <div class="col-lg-6">
+        @using (Html.BeginForm("Invoice", "Home")) //Wywolujemy akcje Invoice w kontrolerze Home
+        {
+            @Html.AntiForgeryToken()
+            //@Html.ValidationSummary();
+
+            if (Model.Invoice.Id == 0)
+            {
+                <p class="alert alert-info mt-4 mb-4">Pola tutul, klient, sposob platnosci i termin sa <strong>wymagane</strong></p>
+            }
+
+            @Html.HiddenFor(x => x.Invoice.Id)
+            @Html.HiddenFor(x => x.Invoice.UserId)
+
+
+            <div class="form-group">
+                <!--Odwolujemy sie do ViewModelu, do jego wlasciwosci Invoice i tytulu faktury-->
+                @Html.LabelFor(x => x.Invoice.Title)
+                <!--Wartosc tego pola zostanie przekazana do akcji w kontrolerze-->
+                @Html.TextBoxFor(x => x.Invoice.Title, new { @class = "form-control", autofocus = "autofocus" })
+                @Html.ValidationMessageFor(x => x.Invoice.Title)
+            </div>
+
+            <div class="form-group">
+                @Html.LabelFor(x => x.Invoice.ClientId)
+                @Html.DropDownListFor(x => x.Invoice.ClientId,
+                 new SelectList(Model.Clients, "Id", "Name"), "--Wybierz klienta--", new { @class = "Form-control" })
+                @Html.ValidationMessageFor(x => x.Invoice.ClientId)
+            </div>
+
+            if (Model.Invoice.Id != 0)
+            {//Jesli nie 0 to edycja
+                <div class="form-group">
+                    @Html.LabelFor(x => x.Invoice.Value)
+                    @Html.TextBoxFor(x => x.Invoice.Value, new { @class = "form-control", @readonly = "readonly" })
+                </div>
+            }
+
+            <div class="form-group">
+                @Html.LabelFor(x => x.Invoice.MethodOfPayementId)
+                @Html.DropDownListFor(x => x.Invoice.MethodOfPayementId,
+                 new SelectList(Model.MethodOfPayment, "Id", "Name"), "--Wybierz sposob platnosci--", new { @class = "Form-control" })
+                @Html.ValidationMessageFor(x => x.Invoice.MethodOfPayementId)
+            </div>
+
+            <div class="form-group">
+                @Html.LabelFor(x => x.Invoice.PayementDate)
+               @Html.TextBoxFor(x => x.Invoice.PayementDate, "{0:dd-MM-yyyy}",
+                  new { @class = "form-control", @id = "PaymentDate", autocomplete = "off" })
+                @Html.ValidationMessageFor(x => x.Invoice.PayementDate)
+            </div>
+           
+            <div class="form-group">
+                @Html.LabelFor(x => x.Invoice.Comments)
+                @Html.TextAreaFor(x => x.Invoice.Comments, new { @class = "form-control" })
+                @Html.ValidationMessageFor(x => x.Invoice.Comments)
+            </div>
+
+            <button class="btn btn-primary btn-lg mb-5" type="submit">Zapisz</button>
+        }
+    </div>
+
+    <div class="col-5 offset-lg-1">
+        @if (Model.Invoice.Id !=0)
+        {
+            @Html.Partial("_InvoicePosition", Model.Invoice.InvoicePositions)
+        }
+    </div>
+</div>
+
+
+@section Scripts
+    {
+    <script type="text/javascript">
+        function generatePdf() {
+
+             $.ajax({ //Wywolujemy Ajaxa na akcji InvoiceToPdf
+                    type: 'POST',
+                    url: "@Url.Action("InvoiceToPdf", "Print")",
+                 data: {
+                     id: '@Model.Invoice.Id'
+                    },
+                 success: function (data) {
+                        //Pobieramy naszego PDFa. Przekierowujemy do akcji DownloadInvoicePdf
+                        window.location = '@Url.Action("DownloadInvoicePdf", "Print")' + '?fileGuid=' + data.FileGuid + '&fileName=' + data.FileName;
+                    },
+                    error: function (data) {
+                        alert(data.Message);
+                    },
+                 dataType: 'json',
+                 cache: false
+             });
+
+        }
+
+
+        function deleteInvoicePosition(id, invoiceId, btn) {
+            if (!confirm("Czy na pewno chcesz usunac pozycje? Jestem w InvoiceCSHTML")) {
+                return;  //Jesli "Nie" to wychodzimy z tej funkcji
+            }
+
+             $.ajax({
+                    type: 'POST',
+                    url: "@Url.Action("DeletePosition", "Home")",
+                    data: {
+                        id: id,
+                        invoiceId: invoiceId
+
+                    },
+                    success: function (data) {
+                        if (data.Success) {
+                            //Usuwanie
+                            var row = btn.parentNode.parentNode;  //pobieramy caly wiersz
+                            row.parentNode.removeChild(row); //usuwamy caly wiersz
+
+                            /* tez OK
+                            var invoiceVal = data.InvoiceValue;
+                            $('#Invoice_Value').val(invoiceVal.toFixed(2).replace(".", ",")) //jQuery
+                            */
+                            $('#Invoice_Value').val(data.invoiceVal.toFixed(2).replace(".", ",")) //jQuery
+
+                        } else {
+                            alert(data.Message);
+                        }
+
+                    },
+                    error: function (data) {
+                        alert(data.Message);
+                    },
+                    dataType: 'json'
+             });
+
+        }
+
+
+        $(document).ready(function () {
+
+            $.validator.methods.number = function (value, element) {
+                return this.optional(element) || /^-?(?:\d+|\d{1,3}(?:[\s\.,]\d{3})+)(?:[\.,]\d+)?$/.test(value);
+            }
+
+            $.validator.methods.date = function (value, element) {
+                var isChrome = /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
+                if (isChrome) {
+                    var d = new Date();
+                    return this.optional(element) || !/Invalid|NaN/.test(new Date(d.toLocaleDateString(value)));
+                } else {
+                    return this.optional(element) || !/Invalid|NaN/.test(new Date(value));
+                }
+            };
+
+
+            $('#PaymentDate').datepicker({
+                format: "dd-mm-yyyy",
+                language: "pl",
+                multidate: false,
+                autoclose: true,
+                todayHighlight: true,
+                forceParse: false
+            })
+        });
+
+    </script>
+
+}
